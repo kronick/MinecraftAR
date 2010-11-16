@@ -28,10 +28,54 @@ public class Block {
 	public static final int ORANGE_CLOTH =	0x16;
 	public static final int YELLOW_CLOTH =  0x17;
 
+	public static final byte FRONTFACE 	= 1;	// 0b00000001
+	public static final byte BACKFACE 	= 2;	// 0b00000010
+	public static final byte LEFTFACE 	= 4;	// 0b00000100
+	public static final byte RIGHTFACE 	= 8;	// 0b00001000
+	public static final byte TOPFACE 	= 16;	// 0b00010000
+	public static final byte BOTTOMFACE = 32;	// 0b00100000
+	public static final byte BLOCKTRANS = 64;	// 0b01000000
+	public static final byte BLOCKDRAWN = -128; // 0b10000000
+	public static final byte ALLFACES   = 63;	// 0b00111111
+	
+	public static final boolean[] TRANSPARENCIES = {true,
+													false,
+													false,
+													false,
+													false,
+													false,
+													true,
+													false,
+													true,
+													true,
+													false,
+													false,
+													false,
+													false,
+													false,
+													false,
+													false,
+													false,
+													true,
+													false,
+													true,
+													false,
+													false,
+													false
+												   };
+	
 	public Block(short x, short y, short z, byte type) {
 		this.x = x;
 		this.y = y;
 		this.z = z;
 		this.type = type;
 	}
+	
+	public static boolean isTransparent(int type) {
+		if(type < TRANSPARENCIES.length)
+			return TRANSPARENCIES[type];
+		else return false;
+	}
+	
+	
 }

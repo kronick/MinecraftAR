@@ -128,12 +128,13 @@ public class Parser {
 		for(int i=0; i<levelData.length; i++) {
 			// Create a new block for each byte
 			short b_x = (short)(i%256);
-			short b_y = (short)Math.floor(i/(256*256));
+			short b_y = (short)(Math.floor(i/(256*256)));
 			short b_z = (short)(Math.floor(i/256)%256);
 			l.blocks[b_y][b_x][b_z] = levelData[i];
 		}
 
 		world.level = l;
+		l.recalcNeighborOcclusions();
 
 		System.out.println("Level loaded. Map size:");
 		System.out.println("X: " + x + " Y: " + y + " Z: " + z);
