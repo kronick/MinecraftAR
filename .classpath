@@ -12,5 +12,12 @@
 	<classpathentry kind="lib" path="lib/opengl.jar"/>
 	<classpathentry kind="lib" path="lib/PeasyCam.jar"/>
 	<classpathentry kind="lib" path="lib/GLGraphics.jar"/>
+	<classpathentry kind="lib" path="lib/ocd.jar"/>
+	<classpathentry kind="lib" path="lib/video.jar"/>
+	<classpathentry kind="lib" path="lib/NyAR2.jar"/>
+	<classpathentry kind="lib" path="lib/NyARToolkit.jar"/>
+	<classpathentry kind="lib" path="data/4x4_31.patt"/>
+	<classpathentry kind="lib" path="data/4x4_35.patt"/>
+	<classpathentry kind="lib" path="lib/QTJava.zip"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>

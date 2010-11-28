@@ -37,7 +37,7 @@ public class Block {
 	public static final byte BLOCKTRANS = 64;	// 0b01000000
 	public static final byte BLOCKDRAWN = -128; // 0b10000000
 	public static final byte ALLFACES   = 63;	// 0b00111111
-	
+
 	public static final boolean[] TRANSPARENCIES = {true,
 													false,
 													false,
@@ -56,26 +56,26 @@ public class Block {
 													false,
 													false,
 													false,
-													true,
+													false,	// LEAVES
 													false,
-													true,
+													false,	// GLASS
 													false,
 													false,
 													false
 												   };
-	
+
 	public Block(short x, short y, short z, byte type) {
 		this.x = x;
 		this.y = y;
 		this.z = z;
 		this.type = type;
 	}
-	
+
 	public static boolean isTransparent(int type) {
 		if(type < TRANSPARENCIES.length)
 			return TRANSPARENCIES[type];
 		else return false;
 	}
-	
-	
+
+
 }
