@@ -4,11 +4,9 @@ import java.awt.event.MouseWheelEvent;
 import java.awt.event.MouseWheelListener;
 import java.io.*;
 import java.net.*;
-import java.nio.FloatBuffer;
 import java.util.Arrays;
 
 import com.newuntitledpage.minecraftAR.model.*;
-import com.sun.opengl.util.BufferUtil;
 import com.sun.opengl.util.texture.*;
 
 import processing.core.*;
@@ -37,16 +35,18 @@ public class Test extends PApplet {
 	NyARBoard nya;
 
 	PVector modelCenter;
-	float modelScale = 10;
+	float modelScale = 100;
 
 	double[] transMat;
-	double smoothFactor = 0.5;
+	double smoothFactor = 1;
 
 	int[][] blockFaceDisplayLists;
 	int[][] textureMap;
 	Texture terrainTex;
 	Texture playerTex;
 	int playerDisplayListStart;
+
+	PImage testImage;
 
 	float[][] clipPlanes;
 
@@ -59,8 +59,8 @@ public class Test extends PApplet {
 		}
 
 		// - - - - - - - - - - -
-		size(800,600, GLGraphics.GLGRAPHICS);
-		//colorMode(HSB);
+		size(1280,800, GLGraphics.GLGRAPHICS);
+		colorMode(RGB);
 
 		println(Capture.list());
 		cameraIn = new Capture(this,640, 512);
@@ -138,27 +138,58 @@ public class Test extends PApplet {
 		gl = renderer.beginGL();
 		buildDisplayLists(gl);
 		playerDisplayListStart = Player.makeDisplayLists(gl);
+
+		/*
+		float[] fogCol={1f,1f,1f}; // Define a nice light grey
+		gl.glFogfv(GL.GL_FOG_COLOR,fogCol,0);     // Set the fog color
+		gl.glFogi(GL.GL_FOG_MODE, GL.GL_LINEAR);
+		gl.glFogf(GL.GL_FOG_START, 100f * modelScale);
+		gl.glFogf(GL.GL_FOG_END, 200f * modelScale);
+		gl.glEnable(GL.GL_FOG);
+		 */
 		renderer.endGL();
 
+		testImage = loadImage("testcapture.png");
 	}
 
 
 	public void draw() {
-		//println(frameRate);
+		println(frameRate);
 
-		background(255);
+		background(255,255,255);
+
+		if(cameraIn.available() == true) {
+			cameraIn.read();
+
+			//hint(DISABLE_DEPTH_TEST);
+			if(!(keyPressed && key == 'v')) {
+				loadPixels();
+				cameraIn.loadPixels();
+				int s, t, n;
+				for(int x=0; x<width; x++) {
+					for(int y=0; y<height; y++) {
+						n = (int)(cameraIn.width * x/(float)width) + (int)(cameraIn.height * y/(float)height) * cameraIn.width;
+						pixels[x + y*width] = cameraIn.pixels[n];
+					}
+				}
+				updatePixels();
+			}
+
+			pushMatrix();
+				scale(width/(float)cameraIn.width, height/(float)cameraIn.height);
+				if(nya.detect(cameraIn)) {
+				//if(nya.detect(testImage)) {
+					drawMarkerPos(nya.pos2d);
+				}
+			popMatrix();
+			hint(ENABLE_DEPTH_TEST);
+		}
 
 		renderer = (GLGraphics)g;
 		gl = renderer.beginGL();
 
 		for(int i=0; i<nya.transmat.length; i++) {
-			if(true || i<=11) {
-				transMat[i] += (nya.transmat[i] - transMat[i]) * smoothFactor;
-				//transMat[i] = (nya.transmat[i] + transMat[i]) /2;
-			}
-			else {
-				transMat[i] +=  (nya.transmat[i] - transMat[i]) * 2 * smoothFactor;
-			}
+			transMat[i] += (nya.transmat[i] - transMat[i]) * smoothFactor;
 		}
 		PMatrix3D toCameraMatrix = new PMatrix3D((float)transMat[0], (float)transMat[1], (float)transMat[2], (float)transMat[3],
 											(float)transMat[4], (float)transMat[5], (float)transMat[6], (float)transMat[7],
@@ -173,15 +204,24 @@ public class Test extends PApplet {
 			camPosition[0] = ((toCamera[12])) / modelScale + modelCenter.x;
 			camPosition[1] = ((toCamera[13])) / modelScale + modelCenter.y;
 			camPosition[2] = ((toCamera[14])) / modelScale + modelCenter.z;
+
+			if(frameCount%10==0) {
+				try {
+					p.out.writeByte(0x08);
+					p.out.writeByte(0xFF);
+					p.out.writeShort((int)camPosition[0]*32+1);
+					p.out.writeShort((int)camPosition[1]*32+1);
+					p.out.writeShort((int)camPosition[2]*32+1);
+					p.out.writeByte(0x00);
+					p.out.writeByte(0x00);
+				} catch (IOException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+			}
 		}
 
 		glGraphicsBeginTransform(gl, nya);
-		/*cam.feed();
-		camPosition[0] = cam.position()[0]  / modelScale + modelCenter.x;
-		camPosition[1] = -cam.position()[1]  / modelScale + modelCenter.y;
-		camPosition[2] = cam.position()[2]  / modelScale + modelCenter.z;
-		rotateZ(PI);
-		 */
 		scale(modelScale);
 		gl.glTranslatef(-modelCenter.x, -modelCenter.y, -modelCenter.z);
 
@@ -190,102 +230,127 @@ public class Test extends PApplet {
 
 		pushMatrix();
 			translate(modelCenter.x, modelCenter.y, modelCenter.z);
-			float[] ambient = {.1f,.1f,.1f,1f};
-			float[] diffuse = {10f,10f,10f,1f};
-			float[] position = {100,100,0,1};
+			float[] ambient = {.2f,.2f,.2f,1f};
+			float[] diffuse = {50f,50f,50f,1f};
+			float[] position = {0,1024,512,1};
 
+			gl.glLightfv( GL.GL_LIGHT1, GL.GL_AMBIENT, ambient,0);
+			gl.glLightfv( GL.GL_LIGHT1, GL.GL_DIFFUSE, diffuse,0);
+			gl.glLightfv(GL.GL_LIGHT1, GL.GL_POSITION, position,0);
+
+			position[2] = -512;
 			gl.glLightfv( GL.GL_LIGHT2, GL.GL_AMBIENT, ambient,0);
 			gl.glLightfv( GL.GL_LIGHT2, GL.GL_DIFFUSE, diffuse,0);
 			gl.glLightfv(GL.GL_LIGHT2, GL.GL_POSITION, position,0);
+
 			gl.glEnable(GL.GL_LIGHTING);
+			gl.glEnable(GL.GL_LIGHT1);
 			gl.glEnable(GL.GL_LIGHT2);
+			gl.glShadeModel(GL.GL_FLAT);
 
 
 			gl.glColorMaterial(GL.GL_FRONT_AND_BACK, GL.GL_AMBIENT_AND_DIFFUSE);
 			gl.glEnable(GL.GL_COLOR_MATERIAL);
 			gl.glColor3f(1f,1f,1f);
-			terrainTex.enable();
-			terrainTex.bind();
+
 		popMatrix();
 		if(world.level != null) {
-			int n = 0;
 
-			for(int y=0; y<64; y++) {
+			// Draw players
+			playerTex.enable();
+			playerTex.bind();
+			Player _p;
+			for(int i=0; i<world.players.size(); i++) {
+				_p = world.players.get(i);
+				pushMatrix();
+					translate(_p.position[0]/32f-0.5f, _p.position[1]/32f-2, _p.position[2]/32f-0.5f);
+					rotateY(-_p.orientation[0]/256f * 2 * PI + PI);
+
+					pushMatrix();
+						translate(0,Player.TORSO_CENTER_Y,0);
+						gl.glCallList(playerDisplayListStart + Player.TORSO);
+					popMatrix();
+
+					pushMatrix();
+						translate(0,Player.HEAD_CENTER_Y,0);
+						pushMatrix();
+							translate(-Player.TORSO_HALF_WIDTH,0,0);
+							rotateX(-sin(frameCount/3f) * PI / 6);
+							gl.glCallList(playerDisplayListStart + Player.ARM_LEFT);
+						popMatrix();
+						pushMatrix();
+							translate( Player.TORSO_HALF_WIDTH,0,0);
+							rotateX(sin(frameCount/3f) * PI / 6);
+							gl.glCallList(playerDisplayListStart + Player.ARM_RIGHT);
+						popMatrix();
+
+						rotateX(_p.orientation[1]/256f * 2 * PI);
+						gl.glCallList(playerDisplayListStart + Player.HEAD);
+					popMatrix();
+
+					translate(0,Player.WAIST_Y,0);
+					pushMatrix();
+						rotateX(sin(frameCount/3f) * PI / 6);
+						gl.glCallList(playerDisplayListStart + Player.LEG_LEFT);
+					popMatrix();
+					pushMatrix();
+						rotateX(-sin(frameCount/3f) * PI / 6);
+						gl.glCallList(playerDisplayListStart + Player.LEG_RIGHT);
+					popMatrix();
+
+				popMatrix();
+			}
+
+			// Draw blocks
+			terrainTex.enable();
+			terrainTex.bind();
+			int n = 0;
+			for(int y=30; y<64; y++) {
 				for(int x=0; x<64; x++) {
 					for(int z=0; z<64; z++) {
 						byte block = world.level.blocks[y][x][z];
 						byte exposures = world.level.blockExposures[y][x][z];
-						if(block != Block.AIR) {
+						if(true && block != Block.AIR) {
 							pushMatrix();
-							translate(x,y,z);
-							//fill(255,255,255);
-							//noStroke();
+								translate(x,y,z);
+								if((exposures & Block.ALLFACES) > 0) {	// Are any faces drawn?
+									/*
+									gl.glColor3f(0,0,0);
+									gl.glPolygonMode( GL.GL_FRONT_AND_BACK, GL.GL_LINE );
+									gl.glBegin(GL.GL_LINES);
+									*/
 
-							if((exposures & Block.ALLFACES) > 0) {	// Are any faces drawn?
-								/*
-								gl.glColor3f(0,0,0);
-								gl.glPolygonMode( GL.GL_FRONT_AND_BACK, GL.GL_LINE );
-								//gl.glLineWidth(4);
-								gl.glBegin(GL.GL_LINES);
-								if((exposures & Block.FRONTFACE) > 0) gl.glCallList(cubeFaceDisplayLists[0]);
-								if((exposures & Block.BACKFACE) > 0) gl.glCallList(cubeFaceDisplayLists[1]);
-								if((exposures & Block.LEFTFACE) > 0) gl.glCallList(cubeFaceDisplayLists[2]);
-								if((exposures & Block.RIGHTFACE) > 0) gl.glCallList(cubeFaceDisplayLists[3]);
-								if((exposures & Block.TOPFACE) > 0) gl.glCallList(cubeFaceDisplayLists[4]);
-								if((exposures & Block.BOTTOMFACE) > 0) gl.glCallList(cubeFaceDisplayLists[5]);
-								gl.glEnd();
-								*/
+									if(block == Block.STEP) {
+										translate(0, -0.25f, 0);
+										scale(1,0.5f,1);
+									}
 
-								gl.glPolygonMode( GL.GL_FRONT_AND_BACK, GL.GL_FILL);
-								gl.glBegin(GL.GL_QUADS);
+									gl.glPolygonMode( GL.GL_FRONT_AND_BACK, GL.GL_FILL);
+									gl.glBegin(GL.GL_QUADS);
 
+									if(camPosition[2] > z && (exposures & Block.FRONTFACE) > 0) gl.glCallList(blockFaceDisplayLists[block][0]);
+									if(camPosition[2] < z && (exposures & Block.BACKFACE) > 0) gl.glCallList(blockFaceDisplayLists[block][1]);
+									if(camPosition[0] > x && (exposures & Block.RIGHTFACE) > 0) gl.glCallList(blockFaceDisplayLists[block][2]);
+									if(camPosition[0] < x && (exposures & Block.LEFTFACE) > 0) gl.glCallList(blockFaceDisplayLists[block][3]);
+									if(camPosition[1] < y && (exposures & Block.BOTTOMFACE) > 0) gl.glCallList(blockFaceDisplayLists[block][4]);
+									if(camPosition[1] > y && (exposures & Block.TOPFACE) > 0) gl.glCallList(blockFaceDisplayLists[block][5]);
 
-								if(camPosition[2] > z && (exposures & Block.FRONTFACE) > 0) gl.glCallList(blockFaceDisplayLists[block][0]);
-								if(camPosition[2] < z && (exposures & Block.BACKFACE) > 0) gl.glCallList(blockFaceDisplayLists[block][1]);
-								if(camPosition[0] > x && (exposures & Block.RIGHTFACE) > 0) gl.glCallList(blockFaceDisplayLists[block][2]);
-								if(camPosition[0] < x && (exposures & Block.LEFTFACE) > 0) gl.glCallList(blockFaceDisplayLists[block][3]);
-								if(camPosition[1] < y && (exposures & Block.BOTTOMFACE) > 0) gl.glCallList(blockFaceDisplayLists[block][4]);
-								if(camPosition[1] > y && (exposures & Block.TOPFACE) > 0) gl.glCallList(blockFaceDisplayLists[block][5]);
-
-								gl.glEnd();
-								n++;
-							}
+									gl.glEnd();
+									n++;
+								}
 							popMatrix();
 						}
 					}
 				}
 			}
-			//System.out.println("Blocks drawn: " + n);
+			System.out.println("Blocks drawn: " + n);
+		}
 
-		}
-		else {
-			//p.process();
-		}
-		//p.process();
 		glGraphicsEndTransform(gl, nya);
 
-		gl.glDisable(gl.GL_CULL_FACE);
+		gl.glDisable(GL.GL_CULL_FACE);
 		gl.glDisable(GL.GL_LIGHTING);
 		renderer.endGL();
-
-		if(cameraIn.available() == true) {
-			cameraIn.read();
-
-			hint(DISABLE_DEPTH_TEST);
-			pushMatrix();
-			scale(width/(float)cameraIn.width, height/(float)cameraIn.height);
-			if(!(keyPressed && key == 'r'))tint(255,255,255,80);
-			else noTint();
-			if(!(keyPressed && key == 'v')) image(cameraIn, 0,0);
-			//set(0,0, cameraIn);
-
-			if(nya.detect(cameraIn)) {
-				drawMarkerPos(nya.pos2d);
-			}
-			popMatrix();
-			hint(ENABLE_DEPTH_TEST);
-		}
-
 	}
 
 
@@ -295,21 +360,7 @@ public class Test extends PApplet {
 		for(int i=0;i<4;i++){
 			ellipse(nya.pos2d[i][0], nya.pos2d[i][1],5,5);
 		}
-		/*fill(0,0,0);
-		for(int i=0;i<4;i++){
-			text("("+nya.pos2d[i][0]+","+nya.pos2d[i][1]+")",nya.pos2d[i][0],nya.pos2d[i][1]);
-		}
-		*/
 	}
-
-	private FloatBuffer makeBuffer(float[] values) {
-        FloatBuffer floatBuffer = BufferUtil.newFloatBuffer(values.length);
-        for (int i = 0; i < values.length; i++) {
-            floatBuffer.put(values[i]);
-        }
-        floatBuffer.rewind();
-        return floatBuffer;
-    }
 
 	private void glGraphicsBeginTransform(GL gl, NyARBoard nya) {
 		gl.glMatrixMode(GL.GL_PROJECTION);
@@ -358,22 +409,22 @@ public class Test extends PApplet {
 					 {22,22,22,22,22,22},// LEAVES
 					 {48,48,48,48,48,48},// SPONGE
 					 {49,49,49,49,49,49},// GLASS
-					 {56,56,56,56,56,56},// RED CLOTH
-					 {57,57,57,57,57,57},// ORANGE CLOTH
-					 {58,58,58,58,58,58},// YELLOW CLOTH
-					 {59,59,59,59,59,59},// LIME CLOTH
-					 {60,60,60,60,60,60},// GREEN CLOTH
-					 {61,61,61,61,61,61},// AQUA GREEN CLOTH
-					 {62,62,62,62,62,62},// CYAN CLOTH
-					 {63,63,63,63,63,63},// BLUE CLOTH
-					 {64,64,64,64,64,64},// PURPLE CLOTH
-					 {65,65,65,65,65,65},// INDIGO CLOTH
-					 {66,66,66,66,66,66},// VIOLET CLOTH
-					 {67,67,67,67,67,67},// MAGENTA CLOTH
-					 {68,68,68,68,68,68},// PINK CLOTH
-					 {69,69,69,69,69,69},// BLACK CLOTH
-					 {70,70,70,70,70,70},// GRAY CLOTH
-					 {71,71,71,71,71,71},// WHITE CLOTH
+					 {64,64,64,64,64,64},// RED CLOTH
+					 {65,65,65,65,65,65},// ORANGE CLOTH
+					 {66,66,66,66,66,66},// YELLOW CLOTH
+					 {67,67,67,67,67,67},// LIME CLOTH
+					 {68,68,68,68,68,68},// GREEN CLOTH
+					 {69,69,69,69,69,69},// AQUA GREEN CLOTH
+					 {70,70,70,70,70,70},// CYAN CLOTH
+					 {71,71,71,71,71,71},// BLUE CLOTH
+					 {72,72,72,72,72,72},// PURPLE CLOTH
+					 {73,73,73,73,73,73},// INDIGO CLOTH
+					 {74,74,74,74,74,74},// VIOLET CLOTH
+					 {75,75,75,75,75,75},// MAGENTA CLOTH
+					 {76,76,76,76,76,76},// PINK CLOTH
+					 {77,77,77,77,77,77},// BLACK CLOTH
+					 {78,78,78,78,78,78},// GRAY CLOTH
+					 {79,79,79,79,79,79},// WHITE CLOTH
 					 {13,13,13,13,13,13},// YELLOW FLOWER
 					 {12,12,12,12,12,12},// RED ROSE
 					 {29,29,29,29,29,29},// BROWN MUSHROOM
@@ -397,6 +448,8 @@ public class Test extends PApplet {
 		int i = textureMap[block][face];
 		float dx = (corner == 0 || corner == 1) ? 1 : 0;
 		float dy = (corner == 1 || corner == 2) ? 1 : 0;
+		if(block == Block.STEP && face < 4) dy *= .5f;
+
 		float[] out = {1/16f * ((i%16) + dx),
 					   1/16f * (floor(i/16) + dy)};
 		return out;
@@ -547,7 +600,7 @@ public class Test extends PApplet {
 	 * @param args
 	 */
 	public static void main(String[] args) {
-	    PApplet.main(new String[] {"com.newuntitledpage.minecraftAR.Test" });
+	    PApplet.main(new String[] {"--present", "com.newuntitledpage.minecraftAR.Test" });
 
 	}
 

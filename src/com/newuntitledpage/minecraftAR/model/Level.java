@@ -65,7 +65,13 @@ public class Level {
 	private boolean neighborOccludes(int x, int y, int z, int dx, int dy, int dz) {
 		if(blockIsDrawn(x+dx, y+dy, z+dz) && !isTransparent(x+dx, y+dy, z+dz))
 			return true;
-		else return false;
+		else {
+			if(getBlock(x+dx, y+dy, z+dz) == getBlock(x,y,z)  && isTransparent(x,y,z))
+				if(getBlock(x,y,z) != -1) return true;
+				else return false;
+			else
+				return false;
+		}
 	}
 
 	private boolean blockIsDrawn(int x, int y, int z) {
@@ -80,6 +86,11 @@ public class Level {
 		else return true;
 	}
 
+	private byte getBlock(int x, int y, int z) {
+		if(x > 0 && x < xsize && y > 0 && y<ysize && z > 0 && z < zsize)
+			return(blocks[y][x][z]);
+		else return -1;
+	}
 	public void setBlock(int x, int y, int z, byte type) {
 		blocks[y][x][z] = type;
 		System.out.println("Setting block (" + x + ", " + y + ", " + z + ") to: " + type);

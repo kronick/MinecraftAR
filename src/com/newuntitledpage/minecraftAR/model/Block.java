@@ -28,6 +28,8 @@ public class Block {
 	public static final int ORANGE_CLOTH =	0x16;
 	public static final int YELLOW_CLOTH =  0x17;
 
+	public static final int STEP = 			0x2C;
+
 	public static final byte FRONTFACE 	= 1;	// 0b00000001
 	public static final byte BACKFACE 	= 2;	// 0b00000010
 	public static final byte LEFTFACE 	= 4;	// 0b00000100
@@ -56,9 +58,9 @@ public class Block {
 													false,
 													false,
 													false,
-													false,	// LEAVES
+													true,	// LEAVES
 													false,
-													false,	// GLASS
+													true,	// GLASS
 													false,
 													false,
 													false

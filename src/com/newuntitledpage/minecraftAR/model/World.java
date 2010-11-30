@@ -15,7 +15,7 @@ public class World {
 		players.add(new Player(ID, name, x, y, z, heading, pitch));
 	}
 
-	public boolean updatePlayer(byte ID, short x, short y, short z, byte heading, byte pitch) {
+	public void updatePlayer(byte ID, short x, short y, short z, byte heading, byte pitch) {
 		Player p = null;
 		for(int i=0; i<players.size(); i++) {
 			if(players.get(i).ID == ID) {
@@ -23,17 +23,46 @@ public class World {
 				break;
 			}
 		}
-		if(p != null) {
+		if(p == null) {	// Create player if it doesn't exist
+			players.add(new Player(ID, "unknown_" + ID, x, y, z, heading, pitch));
+		}
+		else {
 			p.position[0] = x;
 			p.position[1] = y;
 			p.position[2] = z;
 
 			p.orientation[0] = heading;
 			p.orientation[1] = pitch;
-
-			return true;
 		}
-		else return false;	// Player does not exist!
+	}
+
+	public void movePlayer(byte ID, byte dx, byte dy, byte dz) {
+		Player p = null;
+		for(int i=0; i<players.size(); i++) {
+			if(players.get(i).ID == ID) {
+				p = players.get(i);
+				break;
+			}
+		}
+		if(p != null) {	// Create player if it doesn't exist
+			p.position[0] += dx;
+			p.position[1] += dy;
+			p.position[2] += dz;
+		}
+	}
+
+	public void rotatePlayer(byte ID, byte heading, byte pitch) {
+		Player p = null;
+		for(int i=0; i<players.size(); i++) {
+			if(players.get(i).ID == ID) {
+				p = players.get(i);
+				break;
+			}
+		}
+		if(p != null) {	// Create player if it doesn't exist
+			p.orientation[0] = heading;
+			p.orientation[1] = pitch;
+		}
 	}
 
 	public boolean removePlayer(byte ID) {

@@ -47,7 +47,7 @@ public class Parser extends Thread {
 										 1};
 
 	DataInputStream stream;
-	DataOutputStream out;
+	public DataOutputStream out;
 	World world;
 
 	byte[] levelData;
@@ -66,7 +66,7 @@ public class Parser extends Thread {
 		while(true) {
 			this.process();
 			try {
-				Thread.sleep(10);
+				Thread.sleep(1);
 			} catch (InterruptedException e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
@@ -99,7 +99,11 @@ public class Parser extends Thread {
 						case PLAYER_SPAWN:
 							parsePlayerSpawn(inBytes); break;
 						case PLAYER_TP:
+							parsePlayerTP(inBytes); break;
+						case POSITION_UP:
 							parsePlayerMove(inBytes); break;
+						case ORIENT_UP:
+							parsePlayerRotate(inBytes); break;
 						case PLAYER_DESPAWN:
 							parsePlayerDespawn(inBytes); break;
 						case MESSAGE:
@@ -211,18 +215,40 @@ public class Parser extends Thread {
 		world.addPlayer(ID, name, x, y, z, heading, pitch);
 	}
 
-	private void parsePlayerMove(byte[] in) {
+	private void parsePlayerTP(byte[] in) {
 		byte ID = in[0];
 		short x = byteToShort(in[1],in[2]);
 		short y = byteToShort(in[3],in[4]);
 		short z = byteToShort(in[5],in[6]);
 		byte heading = in[7];
 		byte pitch = in[8];
-		handlePlayerMove(ID, x, y, z, heading, pitch);
+		handlePlayerTP(ID, x, y, z, heading, pitch);
 	}
 
-	private void handlePlayerMove(byte ID, short x, short y, short z, byte heading, byte pitch) {
+	private void handlePlayerTP(byte ID, short x, short y, short z, byte heading, byte pitch) {
 		world.updatePlayer(ID, x, y, z, heading, pitch);
+	}
+
+	private void parsePlayerMove(byte[] in) {
+		byte ID = in[0];
+		byte dx = in[1];
+		byte dy = in[2];
+		byte dz = in[3];
+		handlePlayerMove(ID, dx, dy, dz);
+	}
+	private void handlePlayerMove(byte ID, byte dx, byte dy, byte dz) {
+		world.movePlayer(ID, dx, dy, dz);
+	}
+
+	private void parsePlayerRotate(byte[] in) {
+		byte ID = in[0];
+		byte heading = in[1];
+		byte pitch = in[2];
+
+		handlePlayerRotate(ID, heading, pitch);
+	}
+	private void handlePlayerRotate(byte ID, byte heading, byte pitch) {
+		world.rotatePlayer(ID, heading, pitch);
 	}
 
 	private void parsePlayerDespawn(byte[] in) {
@@ -262,7 +288,8 @@ public class Parser extends Thread {
 	}
 
 	private short byteToShort(byte one, byte two) {
-		return (short)(two + ((short)one << 8));
+		short twoShort = (short)((two > 0) ? two : (256 + two));
+		return (short)(twoShort + ((short)one << 8));
 	}
 
 	private int byteToInt(byte one, byte two, byte three, byte four) {
