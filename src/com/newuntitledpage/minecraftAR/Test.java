@@ -31,14 +31,31 @@ public class Test extends PApplet {
 
 	ScrollWheelEvent wheel;
 
-	Capture cameraIn;
-	NyARBoard nya;
-
 	PVector modelCenter;
 	float modelScale = 100;
 
+	Capture cameraIn;
+	NyARMultiBoard nya;
+	String[] patternFiles = {"4x4_35.patt", "4x4_61.patt", "4x4_24.patt", "4x4_89.patt", "4x4_14.patt", "4x4_51.patt"};
+	double[] patternWidths = {(80 * modelScale/10f), (80 * modelScale/10f), (80 * modelScale/10f),
+							  (80 * modelScale/10f), (80 * modelScale/10f), (80 * modelScale/10f)};
+
+	// Translation: Looking at origin in global coordinates, how do you translate to the marker?
+	// Rotation: Looking at the marker face-on, what are the directions of the global axis, in local coordinates?
+	PMatrix3D[] patternModelTransforms = {new PMatrix3D(1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1),
+										  new PMatrix3D(1,0,0,0, 0,1,0,0, 0,0,1,0, -8,14,0,1),
+										  new PMatrix3D(0,0,-1,0, 0,1,0,0, 1,0,0,0, -4,-8,26,1),
+										  new PMatrix3D(0,0,-1,0, 0,1,0,0, 1,0,0,0, 4,0,-10,1),
+										  new PMatrix3D(0,0,-1,0, 0,1,0,0, 1,0,0,0, 4,14,-10,1),
+										  new PMatrix3D(1,0,0,0, 0,0,-1,0, 0,1,0,0, 30,-8,-12,1)};
+
+	double[][] patternCalculatedTransforms = new double[patternFiles.length][];	// populated later
+
 	double[] transMat;
-	double smoothFactor = 1;
+	double rotateSmoothFactor = .3;
+	double translateSmoothFactor = .6;
+
+	float[] camPosition = {0,0,0};
 
 	int[][] blockFaceDisplayLists;
 	int[][] textureMap;
@@ -59,17 +76,26 @@ public class Test extends PApplet {
 		}
 
 		// - - - - - - - - - - -
-		size(1280,800, GLGraphics.GLGRAPHICS);
+		size(800,600, GLGraphics.GLGRAPHICS);
 		colorMode(RGB);
 
 		println(Capture.list());
 		cameraIn = new Capture(this,640, 512);
 
-
-		nya = new NyARBoard(this, 640,512, "camera_para.dat", "4x4_35.patt", (int)(80 * modelScale/10f), NyARBoard.CS_LEFT);
-		nya.gsThreshold = 100;
+		nya = new NyARMultiBoard(this, 640,512, "camera_para.dat", patternFiles, patternWidths, NyARBoard.CS_LEFT);
+		nya.gsThreshold = 70;		// Binary threshold (black/white cutoff point) [Default = 110]
+		nya.cfThreshold = 0.7;		// Threshold of marker.confidence for marker.detected == true (?????) [Default = 0.4];
 		transMat = new double[16];
 		Arrays.fill(transMat, 0);
+
+		// Scale pattern transforms to model scale
+		for(int i=0; i<patternModelTransforms.length; i++) {
+			patternModelTransforms[i].m30 *= modelScale;
+			patternModelTransforms[i].m31 *= modelScale;
+			patternModelTransforms[i].m32 *= modelScale;
+
+			patternModelTransforms[i].invert();
+		}
 
 		modelCenter = new PVector(11.5f,43.5f,33.5f);
 
@@ -154,14 +180,16 @@ public class Test extends PApplet {
 
 
 	public void draw() {
-		println(frameRate);
+		//nya.gsThreshold = (int)(mouseY/(float)height * 256);
+		//println(nya.gsThreshold);
+		//println(frameRate);
 
 		background(255,255,255);
 
 		if(cameraIn.available() == true) {
 			cameraIn.read();
 
-			//hint(DISABLE_DEPTH_TEST);
+			hint(DISABLE_DEPTH_TEST);
 			if(!(keyPressed && key == 'v')) {
 				loadPixels();
 				cameraIn.loadPixels();
@@ -169,7 +197,12 @@ public class Test extends PApplet {
 				for(int x=0; x<width; x++) {
 					for(int y=0; y<height; y++) {
 						n = (int)(cameraIn.width * x/(float)width) + (int)(cameraIn.height * y/(float)height) * cameraIn.width;
-						pixels[x + y*width] = cameraIn.pixels[n];
+						if(keyPressed && key == 'b') {
+							if(brightness(cameraIn.pixels[n]) < nya.gsThreshold)
+								pixels[x + y*width] = color(0,0,0);
+							else pixels[x + y*width] = color(255,255,255);
+						}
+						else pixels[x + y*width] = cameraIn.pixels[n];
 					}
 				}
 				updatePixels();
@@ -178,50 +211,105 @@ public class Test extends PApplet {
 			pushMatrix();
 				scale(width/(float)cameraIn.width, height/(float)cameraIn.height);
 				if(nya.detect(cameraIn)) {
-				//if(nya.detect(testImage)) {
-					drawMarkerPos(nya.pos2d);
+					for(int i=0; i<nya.markers.length; i++) {
+						if(nya.markers[i].detected)
+							drawMarkerPos(nya.markers[i].pos2d);
+					}
 				}
 			popMatrix();
+
 			hint(ENABLE_DEPTH_TEST);
 		}
 
 		renderer = (GLGraphics)g;
 		gl = renderer.beginGL();
 
-		for(int i=0; i<nya.transmat.length; i++) {
-			transMat[i] += (nya.transmat[i] - transMat[i]) * smoothFactor;
-		}
-		PMatrix3D toCameraMatrix = new PMatrix3D((float)transMat[0], (float)transMat[1], (float)transMat[2], (float)transMat[3],
-											(float)transMat[4], (float)transMat[5], (float)transMat[6], (float)transMat[7],
-											(float)transMat[8], (float)transMat[9], (float)transMat[10], (float)transMat[11],
-											(float)transMat[12], (float)transMat[13], (float)transMat[14], (float)transMat[15]);
+		if(nya.detect(cameraIn)) {
+			// Go through each detected marker, multiply calculated transform by patternModelTransform
+			PMatrix3D _t, _m;
+			double[] weights = new double[nya.markers.length];
+			for(int i=0; i<nya.markers.length; i++) {
+				char k = i == 0 ? '1' : '2';
+				boolean draw = false;
+				if(!keyPressed) draw = true;
+				else if(key == k) draw = true;
 
-		float[] camPosition = {0,0,0};
-		if(toCameraMatrix.invert()){
-			float[] toCamera = null;
-			toCamera = toCameraMatrix.get(toCamera);
+				if(nya.markers[i].detected) {
+					println("Detected marker #" + i + " " + (int)(nya.markers[i].confidence * 100) + "%");
+					_t = glMatrixToPMatrix(nya.markers[i].transmat);
+					//println(_t.m30 + ", " + _t.m31 + ", " + _t.m32);
+					//_t.apply(patternModelTransforms[i]);
+					//println(_t.m30 + ", " + _t.m31 + ", " + _t.m32);
+					//patternCalculatedTransforms[i] = PMatrixToglMatrix(_t);
+					_m = patternModelTransforms[i].get();
+					_m.apply(_t);
+					//println(_t.m30 + ", " + _t.m31 + ", " + _t.m32);
+					println(_m.m30 + ", " + _m.m31 + ", " + _m.m32);
 
-			camPosition[0] = ((toCamera[12])) / modelScale + modelCenter.x;
-			camPosition[1] = ((toCamera[13])) / modelScale + modelCenter.y;
-			camPosition[2] = ((toCamera[14])) / modelScale + modelCenter.z;
+					patternCalculatedTransforms[i] = PMatrixToglMatrix(_m);
+					weights[i] = 1 / sqrt(sq(_t.m30) +sq(_t.m31) +sq(_t.m32)) * nya.markers[i].confidence;
+				}
+				else patternCalculatedTransforms[i] = null;
+			}
 
-			if(frameCount%10==0) {
-				try {
-					p.out.writeByte(0x08);
-					p.out.writeByte(0xFF);
-					p.out.writeShort((int)camPosition[0]*32+1);
-					p.out.writeShort((int)camPosition[1]*32+1);
-					p.out.writeShort((int)camPosition[2]*32+1);
-					p.out.writeByte(0x00);
-					p.out.writeByte(0x00);
-				} catch (IOException e) {
-					// TODO Auto-generated catch block
-					e.printStackTrace();
+			// Average all marker transforms that aren't null
+			// Weight by a combination of distance from camera and confidence
+			// TODO: Throw out the outliers!
+			double[] averageTransform = new double[16];
+			float sum = 0;
+			for(int i=0; i<nya.markers.length; i++) {
+				if(patternCalculatedTransforms[i] != null) {
+					for(int n=0; n<16; n++) {
+						averageTransform[n] += patternCalculatedTransforms[i][n] * weights[i];
+					}
+					sum += weights[i];
+				}
+			}
+			for(int n=0; n<16; n++) {
+				averageTransform[n] /= sum;
+			}
+
+			if(sum > 0) { // Make sure new data was gathered this cycle-- basically, was a marker in sight?
+				for(int i=0; i<averageTransform.length; i++) {
+					if(i<12)
+						transMat[i] += (averageTransform[i] - transMat[i]) * rotateSmoothFactor;
+					else
+						transMat[i] += (averageTransform[i] - transMat[i]) * translateSmoothFactor;
+				}
+			}
+
+			PMatrix3D toCameraMatrix = new PMatrix3D((float)transMat[0], (float)transMat[1], (float)transMat[2], (float)transMat[3],
+												(float)transMat[4], (float)transMat[5], (float)transMat[6], (float)transMat[7],
+												(float)transMat[8], (float)transMat[9], (float)transMat[10], (float)transMat[11],
+												(float)transMat[12], (float)transMat[13], (float)transMat[14], (float)transMat[15]);
+
+			if(toCameraMatrix.invert()){
+				float[] toCamera = null;
+				toCamera = toCameraMatrix.get(toCamera);
+
+				camPosition[0] = ((toCamera[12])) / modelScale + modelCenter.x;
+				camPosition[1] = ((toCamera[13])) / modelScale + modelCenter.y;
+				camPosition[2] = ((toCamera[14])) / modelScale + modelCenter.z;
+
+				if(frameCount%10==0) {
+					try {
+						p.out.writeByte(0x08);
+						p.out.writeByte(0xFF);
+						p.out.writeShort((int)camPosition[0]*32+1);
+						p.out.writeShort((int)camPosition[1]*32+1);
+						p.out.writeShort((int)camPosition[2]*32+1);
+						p.out.writeByte(0x00);
+						p.out.writeByte(0x00);
+					} catch (IOException e) {
+						// TODO Auto-generated catch block
+						e.printStackTrace();
+					}
 				}
 			}
 		}
+		if(nya.projection != null)
+			glGraphicsBeginTransform(gl, nya.projection);
 
-		glGraphicsBeginTransform(gl, nya);
 		scale(modelScale);
 		gl.glTranslatef(-modelCenter.x, -modelCenter.y, -modelCenter.z);
 
@@ -343,10 +431,10 @@ public class Test extends PApplet {
 					}
 				}
 			}
-			System.out.println("Blocks drawn: " + n);
+			//System.out.println("Blocks drawn: " + n);
 		}
 
-		glGraphicsEndTransform(gl, nya);
+		glGraphicsEndTransform(gl);
 
 		gl.glDisable(GL.GL_CULL_FACE);
 		gl.glDisable(GL.GL_LIGHTING);
@@ -355,18 +443,18 @@ public class Test extends PApplet {
 
 
 	void drawMarkerPos(int[][] points) {
-		stroke(100,0,0);
-		fill(100,0,0);
+		stroke(255,0,0);
+		fill(255,0,0);
 		for(int i=0;i<4;i++){
-			ellipse(nya.pos2d[i][0], nya.pos2d[i][1],5,5);
+			ellipse(points[i][0], points[i][1],5,5);
 		}
 	}
 
-	private void glGraphicsBeginTransform(GL gl, NyARBoard nya) {
+	private void glGraphicsBeginTransform(GL gl, double[] projection) {
 		gl.glMatrixMode(GL.GL_PROJECTION);
 		gl.glPushMatrix();
 		gl.glLoadIdentity();
-		gl.glLoadMatrixd(nya.projection,0);
+		gl.glLoadMatrixd(projection,0);
 		gl.glMatrixMode(GL.GL_MODELVIEW);
 		gl.glPushMatrix();
 		gl.glLoadIdentity();
@@ -376,7 +464,7 @@ public class Test extends PApplet {
 		return;
 	}
 
-	private void glGraphicsEndTransform(GL gl, NyARBoard nya) {
+	private void glGraphicsEndTransform(GL gl) {
 		if(gl==null){
 			die("The function beginTransform is never called.", null);
 		}
@@ -385,6 +473,26 @@ public class Test extends PApplet {
 		gl.glMatrixMode(GL.GL_PROJECTION);
 		gl.glPopMatrix();
 		gl.glMatrixMode(GL.GL_MODELVIEW);
+	}
+
+	public PMatrix3D glMatrixToPMatrix(double[] mat) {
+		if(mat.length == 16)
+			return new PMatrix3D((float)mat[0], (float)mat[1], (float)mat[2], (float)mat[3],
+								 (float)mat[4], (float)mat[5], (float)mat[6], (float)mat[7],
+								 (float)mat[8], (float)mat[9], (float)mat[10], (float)mat[11],
+								 (float)mat[12], (float)mat[13], (float)mat[14], (float)mat[15]);
+		else return null;
+	}
+
+	public double[] PMatrixToglMatrix(PMatrix3D mat) {
+		if(mat != null) {
+			double[] out = {mat.m00, mat.m01, mat.m02, mat.m03,
+						    mat.m10, mat.m11, mat.m12, mat.m13,
+						    mat.m20, mat.m21, mat.m22, mat.m23,
+						    mat.m30, mat.m31, mat.m32, mat.m33};
+			return out;
+		}
+		else return null;
 	}
 
 	public void buildTextureMap() {
@@ -589,7 +697,6 @@ public class Test extends PApplet {
 			addMouseWheelListener(this);
 		}
 		public void mouseWheelMoved(MouseWheelEvent e) {
-			String message;
 			int notches = e.getWheelRotation();
 			float speed = 1;
 			if(keyPressed && key == CODED && keyCode == CONTROL) speed = 10f;
@@ -600,7 +707,7 @@ public class Test extends PApplet {
 	 * @param args
 	 */
 	public static void main(String[] args) {
-	    PApplet.main(new String[] {"--present", "com.newuntitledpage.minecraftAR.Test" });
+	    PApplet.main(new String[] {"com.newuntitledpage.minecraftAR.Test" });
 
 	}
 
