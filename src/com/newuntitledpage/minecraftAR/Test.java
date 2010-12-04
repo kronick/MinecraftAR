@@ -29,15 +29,21 @@ public class Test extends PApplet {
 	GLGraphics renderer;
 	GL gl;
 
+	PFont sansFont;
+
 	ScrollWheelEvent wheel;
 
-	PVector modelCenter;
 	float modelScale = 100;
 
 	Capture cameraIn;
 	NyARMultiBoard nya;
-	String[] patternFiles = {"4x4_35.patt", "4x4_61.patt", "4x4_24.patt", "4x4_89.patt", "4x4_14.patt", "4x4_51.patt"};
-	double[] patternWidths = {(80 * modelScale/10f), (80 * modelScale/10f), (80 * modelScale/10f),
+	//PVector modelCenter = new PVector(11.5f,43.5f,33.5f);
+	PVector modelCenter = new PVector(0,0,0);
+	String[] patternFiles = {"4x4_35.patt", "4x4_14.patt", "4x4_51.patt", "4x4_61.patt", "4x4_24.patt", "4x4_89.patt",
+							 "4x4_7.patt", "4x4_17.patt", "4x4_9.patt", "4x4_23.patt", "4x4_33.patt", "4x4_34.patt",
+							 "4x4_45.patt", "4x4_47.patt", "4x4_73.patt", "4x4_83.patt", "4x4_91.patt", "4x4_95.patt",
+							 "4x4_98.patt", "4x4_66.patt"};
+	/*double[] patternWidths = {(80 * modelScale/10f), (80 * modelScale/10f), (80 * modelScale/10f),
 							  (80 * modelScale/10f), (80 * modelScale/10f), (80 * modelScale/10f)};
 
 	// Translation: Looking at origin in global coordinates, how do you translate to the marker?
@@ -49,11 +55,45 @@ public class Test extends PApplet {
 										  new PMatrix3D(0,0,-1,0, 0,1,0,0, 1,0,0,0, 4,14,-10,1),
 										  new PMatrix3D(1,0,0,0, 0,0,-1,0, 0,1,0,0, 30,-8,-12,1)};
 
+	 */
+	double[] patternWidths = {(2.75 * modelScale), (2.75 * modelScale), (2.75 * modelScale),
+			  				  (1.75 * modelScale), (1.75 * modelScale), (1.75 * modelScale),
+			  				  .5*modelScale, .5*modelScale, .5*modelScale, .5*modelScale,
+			  				  .5*modelScale, .5*modelScale, .5*modelScale, .5*modelScale,
+			  				  .5*modelScale, .5*modelScale, .5*modelScale, .5*modelScale,
+			  				  .5*modelScale, .5*modelScale};
+
+	// Translation: Looking at origin in global coordinates, how do you translate to the marker?
+	// Rotation: Looking at the marker face-on, what are the directions of the global axis, in local coordinates?
+	PMatrix3D[] patternModelTransforms = {new PMatrix3D(-1,0,0,0, 0,1,0,0, 0,0,-1,0, 40.5f,43,31,1),
+										  new PMatrix3D(-1,0,0,0, 0,1,0,0, 0,0,-1,0, 20.5f,43,31,1),
+										  new PMatrix3D(-1,0,0,0, 0,1,0,0, 0,0,-1,0, 60.5f,43,31,1),
+										  new PMatrix3D(-1,0,0,0, 0,1,0,0, 0,0,-1,0, 10.5f,37,34,1),
+										  new PMatrix3D(-1,0,0,0, 0,1,0,0, 0,0,-1,0, 30.5f,37,34,1),
+										  new PMatrix3D(-1,0,0,0, 0,1,0,0, 0,0,-1,0, 50.5f,37,34,1),
+
+										  // First floor doors
+										  new PMatrix3D(-1,0,0,0, 0,1,0,0, 0,0,-1,0, 3,35,34,1),	// 7
+										  new PMatrix3D(-1,0,0,0, 0,1,0,0, 0,0,-1,0, 18,35,34,1),	// 17
+										  new PMatrix3D(-1,0,0,0, 0,1,0,0, 0,0,-1,0, 22,35,34,1),	// 9
+										  new PMatrix3D(-1,0,0,0, 0,1,0,0, 0,0,-1,0, 38,35,34,1),	// 23
+										  new PMatrix3D(-1,0,0,0, 0,1,0,0, 0,0,-1,0, 42,35,34,1),	// 33
+										  new PMatrix3D(-1,0,0,0, 0,1,0,0, 0,0,-1,0, 48,35,34,1),	// 34
+										  new PMatrix3D(-1,0,0,0, 0,1,0,0, 0,0,-1,0, 52,35,34,1),	// 45
+										  //Second floor doors
+										  new PMatrix3D(-1,0,0,0, 0,1,0,0, 0,0,-1,0, 3.5f,45,40,1),
+										  new PMatrix3D(-1,0,0,0, 0,1,0,0, 0,0,-1,0, 17.5f,45,40,1),
+										  new PMatrix3D(-1,0,0,0, 0,1,0,0, 0,0,-1,0, 22.5f,45,40,1),
+										  new PMatrix3D(-1,0,0,0, 0,1,0,0, 0,0,-1,0, 37.5f,45,40,1),
+										  new PMatrix3D(-1,0,0,0, 0,1,0,0, 0,0,-1,0, 42.5f,45,40,1),
+										  new PMatrix3D(-1,0,0,0, 0,1,0,0, 0,0,-1,0, 47.5f,45,40,1),
+										  new PMatrix3D(-1,0,0,0, 0,1,0,0, 0,0,-1,0, 52.5f,45,40,1)};
+
 	double[][] patternCalculatedTransforms = new double[patternFiles.length][];	// populated later
 
 	double[] transMat;
 	double rotateSmoothFactor = .3;
-	double translateSmoothFactor = .6;
+	double translateSmoothFactor = .3;
 
 	float[] camPosition = {0,0,0};
 
@@ -76,15 +116,18 @@ public class Test extends PApplet {
 		}
 
 		// - - - - - - - - - - -
-		size(800,600, GLGraphics.GLGRAPHICS);
+		size(1280,800, GLGraphics.GLGRAPHICS);
 		colorMode(RGB);
+
+		sansFont = createFont("Helvetica Bold", 18, true);
+		textFont(sansFont);
 
 		println(Capture.list());
 		cameraIn = new Capture(this,640, 512);
 
-		nya = new NyARMultiBoard(this, 640,512, "camera_para.dat", patternFiles, patternWidths, NyARBoard.CS_LEFT);
-		nya.gsThreshold = 70;		// Binary threshold (black/white cutoff point) [Default = 110]
-		nya.cfThreshold = 0.7;		// Threshold of marker.confidence for marker.detected == true (?????) [Default = 0.4];
+		nya = new NyARMultiBoard(this, 640,512, "fisheye.dat", patternFiles, patternWidths, NyARBoard.CS_LEFT);
+		nya.gsThreshold = 160;		// Binary threshold (black/white cutoff point) [Default = 110]
+		nya.cfThreshold = 0.4;		// Threshold of marker.confidence for marker.detected == true (?????) [Default = 0.4];
 		transMat = new double[16];
 		Arrays.fill(transMat, 0);
 
@@ -97,8 +140,6 @@ public class Test extends PApplet {
 			patternModelTransforms[i].invert();
 		}
 
-		modelCenter = new PVector(11.5f,43.5f,33.5f);
-
 		cam = new Camera(this, 0,-100,-100, 0,-90,-90,
 							radians(90), width/(float)height, .1f, 1000f);
 		wheel = new ScrollWheelEvent();
@@ -110,7 +151,7 @@ public class Test extends PApplet {
 		System.out.println("Starting connection...");
 
 		try {
-			mcSocket = new Socket("128.54.23.252", 255); //128.54.23.252
+			mcSocket = new Socket("128.54.23.252", 257); //128.54.23.252
 			//mcSocket = new Socket("localhost", 25565); //128.54.23.252
 			out = new DataOutputStream(mcSocket.getOutputStream());
 			in  = new DataInputStream(mcSocket.getInputStream());
@@ -179,18 +220,11 @@ public class Test extends PApplet {
 	}
 
 
-	public void draw() {
-		//nya.gsThreshold = (int)(mouseY/(float)height * 256);
-		//println(nya.gsThreshold);
-		//println(frameRate);
-
-		background(255,255,255);
-
+	public void drawCameraImage() {
 		if(cameraIn.available() == true) {
 			cameraIn.read();
-
-			hint(DISABLE_DEPTH_TEST);
 			if(!(keyPressed && key == 'v')) {
+				/*
 				loadPixels();
 				cameraIn.loadPixels();
 				int s, t, n;
@@ -206,6 +240,27 @@ public class Test extends PApplet {
 					}
 				}
 				updatePixels();
+				*/
+				if(keyPressed && key == 'b') {
+					loadPixels();
+					cameraIn.loadPixels();
+					int s, t, n;
+					for(int x=0; x<width; x++) {
+						for(int y=0; y<height; y++) {
+							n = (int)(cameraIn.width * x/(float)width) + (int)(cameraIn.height * y/(float)height) * cameraIn.width;
+							if(brightness(cameraIn.pixels[n]) < nya.gsThreshold)
+								pixels[x + y*width] = color(0,0,0);
+							else pixels[x + y*width] = color(255,255,255);
+						}
+					}
+					updatePixels();
+				}
+				else {
+					if(!(keyPressed && key == 'r'))
+						tint(255,255,255,120);
+					else noTint();
+					image(cameraIn, 0,0, width, height);
+				}
 			}
 
 			pushMatrix();
@@ -217,13 +272,20 @@ public class Test extends PApplet {
 					}
 				}
 			popMatrix();
-
-			hint(ENABLE_DEPTH_TEST);
 		}
+	}
+
+	public void draw() {
+		//nya.gsThreshold = (int)(mouseY/(float)height * 256);
+		//println(nya.gsThreshold);
+		//println(frameRate);
+
+		background(255,255,255);
+
+		//drawCameraImage();
 
 		renderer = (GLGraphics)g;
 		gl = renderer.beginGL();
-
 		if(nya.detect(cameraIn)) {
 			// Go through each detected marker, multiply calculated transform by patternModelTransform
 			PMatrix3D _t, _m;
@@ -394,8 +456,8 @@ public class Test extends PApplet {
 			terrainTex.bind();
 			int n = 0;
 			for(int y=30; y<64; y++) {
-				for(int x=0; x<64; x++) {
-					for(int z=0; z<64; z++) {
+				for(int x=0; x<80; x++) {
+					for(int z=0; z<80; z++) {
 						byte block = world.level.blocks[y][x][z];
 						byte exposures = world.level.blockExposures[y][x][z];
 						if(true && block != Block.AIR) {
@@ -438,16 +500,33 @@ public class Test extends PApplet {
 
 		gl.glDisable(GL.GL_CULL_FACE);
 		gl.glDisable(GL.GL_LIGHTING);
+		gl.glFlush();
+		gl.glFinish();
 		renderer.endGL();
+
+		hint(DISABLE_DEPTH_TEST);
+		drawCameraImage();
+		if(world.messageTimeout > 0) {
+			fill(0,0,0);
+			noStroke();
+			for(int i=0; i<world.messages.length; i++) {
+				text(world.messages[i], 10, height-20 * (i) - 20);
+			}
+			world.messageTimeout--;
+		}
+		hint(ENABLE_DEPTH_TEST);
+
 	}
 
 
 	void drawMarkerPos(int[][] points) {
-		stroke(255,0,0);
-		fill(255,0,0);
+		noStroke();
+		fill(0,0,0,abs((frameCount%6)-3) * 20 + 50);
+		beginShape();
 		for(int i=0;i<4;i++){
-			ellipse(points[i][0], points[i][1],5,5);
+			vertex(points[i][0], points[i][1]);
 		}
+		endShape();
 	}
 
 	private void glGraphicsBeginTransform(GL gl, double[] projection) {
@@ -673,7 +752,10 @@ public class Test extends PApplet {
 
 
 	public void keyPressed() {
-
+		if(key == CODED && keyCode == UP)
+			nya.gsThreshold += 5;
+		if(key == CODED && keyCode == DOWN)
+			nya.gsThreshold -= 5;
 	}
 
 	public void mouseDragged() {
@@ -707,7 +789,7 @@ public class Test extends PApplet {
 	 * @param args
 	 */
 	public static void main(String[] args) {
-	    PApplet.main(new String[] {"com.newuntitledpage.minecraftAR.Test" });
+	    PApplet.main(new String[] {"--present", "com.newuntitledpage.minecraftAR.Test" });
 
 	}
 

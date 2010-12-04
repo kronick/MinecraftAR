@@ -16,8 +16,6 @@
 	<classpathentry kind="lib" path="lib/video.jar"/>
 	<classpathentry kind="lib" path="lib/NyAR2.jar"/>
 	<classpathentry kind="lib" path="lib/NyARToolkit.jar"/>
-	<classpathentry kind="lib" path="data/4x4_31.patt"/>
-	<classpathentry kind="lib" path="data/4x4_35.patt"/>
 	<classpathentry kind="lib" path="lib/QTJava.zip"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>

@@ -4,6 +4,8 @@ import java.util.ArrayList;
 
 public class World {
 	public Level level;
+	public String[] messages = {"", "", "", "", "", "", "", "", ""};
+	public int messageTimeout = 100;
 
 	public ArrayList<Player> players;
 

@@ -267,10 +267,18 @@ public class Parser extends Thread {
 
 	private void handleMessage(byte ID, String text) {
 		Player p = world.getPlayer(ID);
+		String message;
 		if(p != null)
-			System.out.println(">" + p.name + ": " + text);
+			message = ">" + text;
 		else
-			System.out.println(">>>" + text);
+			message = ">>>" + text;
+
+		System.out.println(message);
+		for(int i=world.messages.length-1; i>0; i--) {
+			world.messages[i] = world.messages[i-1];
+		}
+		world.messages[0] = message;
+		world.messageTimeout = 100;
 		// TODO: Log the message somewhere, too
 	}
 
